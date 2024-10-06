@@ -1,79 +1,94 @@
 import tkinter
-from click import style
-from colorama import Style
-from numpy import insert
 import tkintermapview
 import phonenumbers
-import opencage
-
-from key import key
-
-from phonenumbers import geocoder
-from phonenumbers import carrier
-
+from phonenumbers import geocoder, carrier
+from opencage.geocoder import OpenCageGeocode
 from tkinter import *
 from tkinter import messagebox
-from tkinter.ttk import *
-
-from opencage.geocoder import OpenCageGeocode
+from tkinter.ttk import Style
+from key import key  # Make sure this file has your OpenCage API key
 
 root = tkinter.Tk()
-root.geometry("500x500")
+root.geometry("500x600")  # Adjusted height for better layout
 
-label1 = Label(text="GEO TRACKER!")
-label1.pack()
+label1 = Label(text="GEO TRACKER!", font=('calibri', 24, 'bold'))
+label1.pack(pady=10)
 
+# Function to get the result based on the input phone number
 def getResult():
-    num = number.get("1.0", END)
-    try:
-        num1 = phonenumbers.parse(num)
-    except:
-        messagebox.showerror("Error", "Number box is empty or the input is not numeric. \nPlease enter a 10 digit numerical value along with your country code!")
+    num = number.get("1.0", END).strip()  # Get input and remove extra spaces
+    if not num:
+        messagebox.showerror("Error", "Please enter a phone number.")
+        return
 
+    try:
+        num1 = phonenumbers.parse(num)  # Parse the phone number
+    except phonenumbers.phonenumberutil.NumberParseException:
+        messagebox.showerror("Error", "Invalid phone number format. Please include the country code.")
+        return
+
+    # Check if the number is valid
+    if not phonenumbers.is_valid_number(num1):
+        messagebox.showerror("Error", "The phone number is not valid.")
+        return
+
+    # Get location and service provider
     location = geocoder.description_for_number(num1, "en")
     service_provider = carrier.name_for_number(num1, "en")
 
+    # Get coordinates using OpenCage
     ocg = OpenCageGeocode(key)
-    query = str(location)
-    results = ocg.geocode(query)
+    results = ocg.geocode(location)  # Directly use the location description for geocoding
+
+    if not results:
+        messagebox.showerror("Error", "Location not found.")
+        return
 
     lat = results[0]['geometry']['lat']
     lng = results[0]['geometry']['lng']
-    
+
+    # Create a map widget to display the location
     my_label = LabelFrame(root)
     my_label.pack(pady=20)
-    
-    map_widget = tkintermapview.TkinterMapView(my_label, width=450, height=450, corner_radius=0)
-    map_widget.set_position(lat, lng)
-    map_widget.set_marker(lat, lng, text = "PHONE LOCATION ")
-    map_widget.set_zoom(10)
-    map_widget.place(relx=0.5, rely=0.5, anchor=tkinter.CENTER)
-    map_widget.pack()
 
+    # Create and configure the map widget
+    map_widget = tkintermapview.TkinterMapView(my_label, width=450, height=450, corner_radius=0)
+    map_widget.set_position(lat, lng)  # Set the position based on coordinates
+    map_widget.set_marker(lat, lng, text="PHONE LOCATION")  # Add a marker for the phone location
+    map_widget.set_zoom(10)  # Set the zoom level
+    map_widget.pack(padx=10, pady=10)  # Use pack to display the map
+
+    # Get the address details
     adr = tkintermapview.convert_coordinates_to_address(lat, lng)
 
-    result.insert(END, "THE COUNTRY OF THIS NUMBER IS LOCATED : " + location)
-    result.insert(END, "\nTHE SIM CARD OF THIS NUMBER : " + service_provider)
+    # Display the results in the result text box
+    result.delete(1.0, END)  # Clear previous results
+    result.insert(END, "THE COUNTRY OF THIS NUMBER IS LOCATED: " + str(location))
+    result.insert(END, "\nTHE SIM CARD OF THIS NUMBER: " + str(service_provider))
+    result.insert(END, "\nLATITUDE: " + str(lat))
+    result.insert(END, "\nLONGITUDE: " + str(lng))
 
-    result.index(END, "\nLATITUDE : " + str(lat))
-    result.index(END, "\nLONGITUDE : " + str(lng))
+    if adr:
+        result.insert(END, "\nSTREET ADDRESS: " + str(adr.street))
+        result.insert(END, "\nCITY ADDRESS: " + str(adr.city))
+        result.insert(END, "\nPOSTAL CODE: " + str(adr.postal))
 
-    result.insert(END, "\nSTREET ADDRESS : " + adr.street)
-    result.insert(END, "\nCITY ADDRESS : " + adr.city)
-    result.insert(END, "\nPOSTAL CODE : " + adr.postal)
+# Input field for phone number
+number = Text(height=1, width=30)
+number.pack(pady=10)
 
-number = Text(height=1)
-number.pack()
-
+# Style for buttons
 style = Style()
-style.configure("TButton", font= ('calibri', 20, 'bold'), borderwidth='4')
-style.map('TButton', foreground = [('active', '!disabled', 'green')], 
-                     background = [('active', 'black')])
+style.configure("TButton", font=('calibri', 20, 'bold'), borderwidth='4')
+style.map('TButton', foreground=[('active', '!disabled', 'green')], 
+                     background=[('active', 'black')])
 
+# Search button
 button = Button(text="Search", command=getResult)
-button.pack(pady = 10, padx=100)
+button.pack(pady=10, padx=100)
 
-result = Text(height=7)
-result.pack()
+# Result display
+result = Text(height=15, width=60)
+result.pack(pady=10)
 
 root.mainloop()
